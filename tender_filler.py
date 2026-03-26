@@ -20,6 +20,12 @@ import re
 import sys
 import copy
 from pathlib import Path
+import csv
+
+# ─────────────────────────────────────────────
+# DEBUG CONFIGURATION
+# ─────────────────────────────────────────────
+VERBOSE_MODE = False  # Set to True for detailed debug logging
 
 # ─────────────────────────────────────────────
 # SEMANTIC FIELD MAPPING
@@ -52,14 +58,22 @@ SEMANTIC_MAP = [
      "azienda.cf_piva"),
     (r"p(?:artita|\.?\s*)i(?:va|\.?\s*v\.?\s*a\.?\s*)|partita\s*iva",
      "azienda.cf_piva"),
-    (r"sede\s*legale|sede\s*(?:in|a)|con\s*sede\s*(?:in|a)|via|indirizzo\s*sede",
+    (r"sede\s*legale(?!\s*amm)|sede\s*(?:in|a)\s*\(|con\s*sede\s*(?:legale|in)|via\s*dell",
      "azienda.sede_legale"),
-    (r"cap\s*sede|c\.?a\.?p\.?\s*$",
+    (r"cap\s*(?:sede\s*legale)?|c\.?a\.?p\.?\s*(?:legale|$)",
      "azienda.sede_legale_cap"),
-    (r"citt[aà]\s*sede|comune\s*sede|localit[aà]",
+    (r"citt[aà]\s*sede\s*legale|comune\s*sede\s*legale|localit[aà]",
      "azienda.sede_legale_citta"),
-    (r"prov(?:\.|incia)?\s*sede",
+    (r"prov(?:\.|incia)?\s*(?:di\s*)?sede\s*legale|prov\.\s*sede",
      "azienda.sede_legale_provincia"),
+    (r"sede\s*amministrativa|sede\s*amm(?:\.|istrativa)?",
+     "azienda.sede_amministrativa"),
+    (r"cap\s*(?:amministrativa|amm\.?)|c\.?a\.?p\.?\s*amm",
+     "azienda.sede_amm_cap"),
+    (r"citt[aà]\s*(?:amministrativa|amm\.?)|comune\s*(?:amministrativa|amm\.?)",
+     "azienda.sede_amm_citta"),
+    (r"prov(?:\.|incia)?\s*(?:amministrativa|amm\.?)",
+     "azienda.sede_amm_provincia"),
     (r"tel(?:efono|\.?\s*)|phone|recapito\s*telefonico",
      "azienda.telefono"),
     (r"fax",
@@ -82,15 +96,67 @@ SEMANTIC_MAP = [
      "azienda.ateco"),
     (r"c\.?c\.?n\.?l\.?|contratto\s*(?:collettivo|nazionale)",
      "azienda.ccnl"),
-    (r"(?:n(?:umero|\.?)?\s*)?dipendenti|organico|personale\s*(?:medio|complessivo)",
+    (r"(?:n(?:umero|\.?)?\s*)?dipendenti|organico|personale\s*(?:medio|complessivo)|occupati|numero\s+complessivo|complessivi",
      "azienda.dipendenti_totale"),
+    (r"(?:attivit[aà]|oggetto|descrizione|settore|ramo|classe|natura)\s*(?:economica|principale|dell[a'])?|descrizione\s*(?:attivit[aà]|della\s*(?:attivit[aà]|impresa))",
+     "azienda.ateco_descrizione"),
+    
+    # Additional patterns for common variations
+    (r"(?:indirizzo|via|corso|piazza|viale|largo|borgo|contrada)\s*(?:dell[a']|del|di|della)?\s*[A-Z]",
+     "azienda.sede_legale"),
+    (r"n\.?\s*civico|numero\s*civico|snc",
+     "azienda.sede_legale"),
+    (r"cognome|nome\s*e\s*cognome\s*del\s*sottoscritto",
+     "legale_rappresentante.nome_completo"),
+    (r"qual(?:ifica|it[aà])\s*(?:del\s*)?(?:legale\s*)?(?:rappresentante|dichiarante)",
+     "legale_rappresentante.qualifica"),
+    (r"telefono|cellulare|contatto|numero\s*di\s*telefono",
+     "azienda.telefono"),
+    (r"indirizzo\s*e-?mail|email\s*ordinaria|posta\s*ordinaria",
+     "azienda.email"),
+    
+    # Explicit full forms (highest priority)
+    (r"ragione\s*sociale\s*dell[a'](?:impresa|azienda|ditta|societ[aà])?|denominazione\s*della\s*(?:impresa|azienda|ditta|societ[aà])",
+     "azienda.ragione_sociale"),
+    (r"numero\s+(?:di\s+)?dipendenti|complessivo\s+di\s+dipendenti|numero\s+complessivo",
+     "azienda.dipendenti_totale"),
+    (r"natura\s+dell[a']\s*attivit[aà]|descrizione\s+dell[a']\s*(?:attivit[aà]|impresa)|oggetto\s+dell[a']\s*attivit[aà]|attivit[aà]\s+principale",
+     "azienda.ateco_descrizione"),
 ]
 
 
 def load_profile(path):
-    """Load company profile from JSON file."""
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    """Load company profile from JSON or CSV file."""
+    ext = Path(path).suffix.lower()
+    if ext == '.json':
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    elif ext == '.csv':
+        profile = {}
+        with open(path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                section = row.get('section', '').strip()
+                key = row.get('key', '').strip()
+                value = row.get('value', '').strip()
+                if not section or not key:
+                    continue
+                if section not in profile:
+                    profile[section] = {}
+                # Handle lists like 'soci'
+                if section == 'soci':
+                    if 'soci' not in profile:
+                        profile['soci'] = []
+                    profile['soci'].append({
+                        'nome': row.get('nome', value),
+                        'quota': row.get('quota', ''),
+                        'ruolo': row.get('ruolo', '')
+                    })
+                else:
+                    profile[section][key] = value
+        return profile
+    else:
+        raise ValueError(f"Unsupported profile format: {ext}. Use .json or .csv")
 
 
 def get_profile_value(profile, dotted_key):
@@ -118,8 +184,74 @@ def match_label(text, profile):
         if re.search(pattern, text_lower, re.IGNORECASE):
             val = get_profile_value(profile, key)
             if val:
+                if VERBOSE_MODE:
+                    print(f"      ✓ Matched '{text[:50]}' → {key} = '{str(val)[:40]}'")
                 return key, val
+    
+    if VERBOSE_MODE and len(text_lower) > 3:
+        print(f"      ✗ No match for '{text[:60]}'")
     return None, None
+
+
+def highlight_empty_fields(doc):
+    """
+    Scan document for truly unfilled fields and highlight them in yellow.
+    Skip fields that have been filled with actual content.
+    Returns count of highlighted fields.
+    """
+    from docx.enum.text import WD_COLOR_INDEX
+    count = 0
+    
+    for para in doc.paragraphs:
+        # Scan each run for unfilled markers that are NOT part of filled content
+        for run in para.runs:
+            if not run.text:
+                continue
+            
+            # Check if this run contains ONLY placeholder markers (no real content)
+            text = run.text
+            
+            # Pattern: pure underscore blanks (3+ underscores, maybe with trailing/leading space)
+            if re.match(r'^\s*_{3,}\s*$', text):
+                try:
+                    run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+                    count += 1
+                except:
+                    pass
+            # Pattern: pure dots/ellipsis (3+ dots, maybe spaces)
+            elif re.match(r'^\s*(?:\.{3,}|…+)\s*$', text):
+                try:
+                    run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+                    count += 1
+                except:
+                    pass
+    
+    # Also check table cells
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    for run in para.runs:
+                        if not run.text:
+                            continue
+                        
+                        text = run.text
+                        
+                        # Only highlight pure placeholder runs
+                        if re.match(r'^\s*_{3,}\s*$', text):
+                            try:
+                                run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+                                count += 1
+                            except:
+                                pass
+                        elif re.match(r'^\s*(?:\.{3,}|…+)\s*$', text):
+                            try:
+                                run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+                                count += 1
+                            except:
+                                pass
+    
+    return count
 
 
 # ═════════════════════════════════════════════
@@ -435,6 +567,10 @@ def fill_docx(form_path, profile, output_path):
                     changed = True
 
         if changed:
+            # Clean up any trailing underscores or dots after the filled value
+            modified = re.sub(r'(\S+(?:\s+\S+)*)\s*_{3,}', r'\1', modified)  # Remove trailing underscores
+            modified = re.sub(r'(\S+(?:\s+\S+)*)\s*\.{3,}', r'\1', modified)  # Remove trailing dots
+            
             if paragraph.runs:
                 paragraph.runs[0].text = modified
                 for r in paragraph.runs[1:]:
@@ -468,6 +604,9 @@ def fill_docx(form_path, profile, output_path):
     for para in doc.paragraphs:
         fill_context_runs(para)
 
+    print("  [DOCX] Running Strategy 6: Highlighting unfilled fields in yellow...")
+    highlighted_count = highlight_empty_fields(doc)
+
     # Save
     doc.save(output_path)
 
@@ -477,6 +616,7 @@ def fill_docx(form_path, profile, output_path):
     print(f"     SDT checkboxes toggled:   {stats['sdt_checkbox']}")
     print(f"     Table cells filled:       {stats['table_cell']}")
     print(f"     Context runs replaced:    {stats['context_run']}")
+    print(f"     Empty fields highlighted: {highlighted_count}")
     return True
 
 
@@ -623,24 +763,27 @@ def main():
         epilog="""
 Examples:
   python tender_filler.py --form "Allegato_1.docx" --profile company_profile.json
-  python tender_filler.py --form "Domanda.pdf" --profile company_profile.json
-  python tender_filler.py --form "Istanza.docx"   (uses ./company_profile.json by default)
+  python tender_filler.py --form "Domanda.pdf" --profile company_profile.csv
+  python tender_filler.py --auto  (processes all forms in EMPTY_FORM/ and saves to FILLED_FORM/)
         """
     )
-    parser.add_argument('--form', '-f', required=True, help='Path to the form file (.docx or .pdf)')
+    parser.add_argument('--form', '-f', help='Path to the form file (.docx or .pdf)')
     parser.add_argument('--profile', '-p', default='company_profile.json',
-                       help='Path to company profile JSON (default: company_profile.json)')
+                       help='Path to company profile JSON/CSV (default: company_profile.json)')
     parser.add_argument('--output', '-o', default=None,
                        help='Output file path (default: adds _COMPILATO suffix)')
+    parser.add_argument('--auto', action='store_true',
+                       help='Automatically process all forms in EMPTY_FORM/ and save to FILLED_FORM/')
+    parser.add_argument('--verbose', '-v', action='store_true',
+                       help='Enable detailed debug logging for field matching')
 
     args = parser.parse_args()
+    
+    # Set global verbose mode
+    global VERBOSE_MODE
+    VERBOSE_MODE = args.verbose
 
-    # Validate inputs
-    form_path = Path(args.form)
-    if not form_path.exists():
-        print(f"❌ Form file not found: {form_path}")
-        sys.exit(1)
-
+    # Load profile
     profile_path = Path(args.profile)
     if not profile_path.exists():
         # Try looking in script directory
@@ -648,29 +791,73 @@ Examples:
         profile_path = script_dir / args.profile
         if not profile_path.exists():
             print(f"❌ Profile file not found: {args.profile}")
-            print(f"   Create one by copying and editing company_profile.json")
+            print(f"   Create one by copying and editing company_profile.json or .csv")
             sys.exit(1)
 
-    # Load profile
     print(f"\n📋 Loading company profile from: {profile_path}")
-    profile = load_profile(profile_path)
+    try:
+        profile = load_profile(profile_path)
+    except Exception as e:
+        print(f"❌ Error loading profile: {e}")
+        sys.exit(1)
 
     company = profile.get('azienda', {}).get('ragione_sociale', 'Unknown')
     rep = profile.get('legale_rappresentante', {}).get('nome_completo', 'Unknown')
     print(f"   Company: {company}")
     print(f"   Representative: {rep}")
 
-    # Determine output path
-    if args.output:
-        output_path = Path(args.output)
+    if args.auto:
+        # Auto mode: process all forms in EMPTY_FORM/
+        empty_dir = Path('EMPTY_FORM')
+        filled_dir = Path('FILLED_FORM')
+        filled_dir.mkdir(exist_ok=True)
+
+        if not empty_dir.exists():
+            print("❌ EMPTY_FORM/ directory not found")
+            sys.exit(1)
+
+        forms = list(empty_dir.glob('*.docx')) + list(empty_dir.glob('*.pdf'))
+        if not forms:
+            print("❌ No .docx or .pdf files found in EMPTY_FORM/")
+            sys.exit(1)
+
+        print(f"\n📄 Processing {len(forms)} forms from EMPTY_FORM/ to FILLED_FORM/\n")
+
+        for form_path in forms:
+            output_path = filled_dir / f"{form_path.stem}_COMPILATO{form_path.suffix}"
+            print(f"Processing: {form_path.name} → {output_path.name}")
+            process_form(form_path, profile, output_path)
+
+        print(f"\n🎉 All forms processed! Check FILLED_FORM/ for results.")
     else:
-        suffix = form_path.suffix
-        output_path = form_path.with_name(f"{form_path.stem}_COMPILATO{suffix}")
+        # Manual mode: single form
+        if not args.form:
+            print("❌ Specify --form or use --auto")
+            sys.exit(1)
 
+        form_path = Path(args.form)
+        if not form_path.exists():
+            print(f"❌ Form file not found: {form_path}")
+            sys.exit(1)
+
+        # Determine output path
+        if args.output:
+            output_path = Path(args.output)
+        else:
+            suffix = form_path.suffix
+            output_path = form_path.with_name(f"{form_path.stem}_COMPILATO{suffix}")
+
+        print(f"\n📄 Processing: {form_path.name}")
+        print(f"   Output: {output_path.name}\n")
+
+        process_form(form_path, profile, output_path)
+
+        print(f"\n🎉 Done! Filled form saved to: {output_path}")
+
+
+def process_form(form_path, profile, output_path):
+    """Process a single form file."""
     ext = form_path.suffix.lower()
-    print(f"\n📄 Processing: {form_path.name} ({ext})")
-    print(f"   Output: {output_path.name}\n")
-
     if ext == '.docx':
         success = fill_docx(str(form_path), profile, str(output_path))
     elif ext == '.pdf':
@@ -678,12 +865,11 @@ Examples:
     else:
         print(f"❌ Unsupported file format: {ext}")
         print(f"   Supported: .docx, .pdf")
-        sys.exit(1)
+        return False
 
-    if success:
-        print(f"\n🎉 Done! Filled form saved to: {output_path}")
-    else:
-        print(f"\n⚠️  Form processing completed with warnings. Check output: {output_path}")
+    if not success:
+        print(f"⚠️  Form processing completed with warnings. Check output: {output_path}")
+    return success
 
 
 if __name__ == '__main__':

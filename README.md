@@ -10,10 +10,16 @@ Supports **.docx** (Word) and **.pdf** formats.
 pip install python-docx pymupdf lxml
 
 # 2. Edit your company profile (one-time setup)
-#    Open company_profile.json and replace with YOUR company data
+#    Open company_profile.json or company_profile.csv and replace with YOUR company data
 nano company_profile.json
+# or
+nano company_profile.csv
 
-# 3. Fill a form!
+# 3. Fill forms automatically!
+python tender_filler.py --auto
+# This processes all .docx/.pdf in EMPTY_FORM/ and saves filled copies to FILLED_FORM/
+
+# Or fill a single form manually:
 python tender_filler.py --form "path/to/your/form.docx"
 python tender_filler.py --form "path/to/your/form.pdf"
 ```
@@ -41,13 +47,38 @@ The tool doesn't need exact field names. It uses pattern matching to understand 
 
 ## Company Profile
 
-Edit `company_profile.json` with your data. The structure is:
+You can use either JSON or CSV format for your company profile. CSV is easier to edit in spreadsheets.
 
+### JSON Format (company_profile.json)
 ```json
 {
   "azienda": {
     "ragione_sociale": "Your Company Name",
     "cf_piva": "01234567890",
+    ...
+  },
+  "legale_rappresentante": {
+    "nome_completo": "Your Name",
+    ...
+  }
+}
+```
+
+### CSV Format (company_profile.csv)
+Columns: section,key,value,nome,quota,ruolo
+
+For simple fields:
+```
+section,key,value
+azienda,ragione_sociale,Your Company Name
+azienda,cf_piva,01234567890
+```
+
+For shareholders (soci):
+```
+section,,nome,,quota,ruolo
+soci,,Shareholder Name,,50%,Socio
+```
     ...
   },
   "legale_rappresentante": {
