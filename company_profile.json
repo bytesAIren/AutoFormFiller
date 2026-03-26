@@ -1,0 +1,49 @@
+{
+  "azienda": {
+    "ragione_sociale": "Idrotech Servizi S.r.l.",
+    "forma_giuridica": "Società a responsabilità limitata",
+    "cf_piva": "04782630284",
+    "sede_legale": "Via dell'Industria 18",
+    "sede_legale_cap": "35129",
+    "sede_legale_citta": "Padova",
+    "sede_legale_provincia": "PD",
+    "sede_amministrativa": "Viale Europa 42",
+    "sede_amm_cap": "35030",
+    "sede_amm_citta": "Rubano",
+    "sede_amm_provincia": "PD",
+    "telefono": "049 8674521",
+    "fax": "049 8674599",
+    "pec": "idrotechservizi@pec.it",
+    "email": "info@idrotechservizi.it",
+    "cciaa": "Verona",
+    "rea": "VR-421587",
+    "data_iscrizione": "12/03/2015",
+    "capitale_sociale": "100.000",
+    "ateco": "43.22.01",
+    "ateco_descrizione": "Installazione di impianti idraulici, di riscaldamento e di condizionamento dell'aria",
+    "ccnl": "Metalmeccanico Industria",
+    "dipendenti_totale": "24",
+    "dipendenti_dirigenti": "2",
+    "dipendenti_impiegati": "6",
+    "dipendenti_operai": "16"
+  },
+  "legale_rappresentante": {
+    "nome": "Marco",
+    "cognome": "Bianchi",
+    "nome_completo": "Marco Bianchi",
+    "qualifica": "Legale Rappresentante",
+    "codice_fiscale": "BNCMRC78P14L781X",
+    "luogo_nascita": "Verona",
+    "provincia_nascita": "VR",
+    "data_nascita": "14/09/1978",
+    "residenza": "Via Roma 12",
+    "residenza_cap": "37121",
+    "residenza_citta": "Verona",
+    "residenza_provincia": "VR"
+  },
+  "soci": [
+    {"nome": "Marco Bianchi", "quota": "50%", "ruolo": "Socio e Legale Rappresentante"},
+    {"nome": "Luca Rossi", "quota": "30%", "ruolo": "Socio"},
+    {"nome": "Giulia Verdi", "quota": "20%", "ruolo": "Socio"}
+  ]
+}
