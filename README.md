@@ -28,6 +28,10 @@ python tender_filler.py --auto --verbose
 
 # MVP tuning mode: show label-coverage report before filling
 python tender_filler.py --auto --analyze
+
+# Optional: run quick local UI for MVP testing
+pip install streamlit
+streamlit run app_streamlit.py
 ```
 
 ## How It Works
@@ -126,6 +130,7 @@ AutoFormFiller/
 ## Features
 
 - ✅ **Automatic processing** of all forms in a directory
+- ✅ **Quick Streamlit UI** to test one form/profile interactively
 - ✅ **Dual format support** (JSON and CSV for company profiles)
 - ✅ **Intelligent field recognition** using semantic patterns
 - ✅ **Empty field highlighting** in yellow for manual review
