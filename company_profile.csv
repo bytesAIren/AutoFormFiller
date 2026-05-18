@@ -40,3 +40,6 @@ legale_rappresentante,residenza_provincia,VR,,,
 soci,,Marco Bianchi,,50%,Socio e Legale Rappresentante
 soci,,Luca Rossi,,30%,Socio
 soci,,Giulia Verdi,,20%,Socio
+mappature_label,denominazione operatore economico,azienda.ragione_sociale,,,
+mappature_label,cf operatore,azienda.cf_piva,,,
+mappature_label,mail referente gara,azienda.email,,,
