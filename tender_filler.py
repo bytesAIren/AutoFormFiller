@@ -139,10 +139,8 @@ def load_profile(path):
                 section = row.get('section', '').strip()
                 key = row.get('key', '').strip()
                 value = row.get('value', '').strip()
-                if not section or not key:
+                if not section:
                     continue
-                if section not in profile:
-                    profile[section] = {}
                 # Handle lists like 'soci'
                 if section == 'soci':
                     if 'soci' not in profile:
@@ -153,6 +151,10 @@ def load_profile(path):
                         'ruolo': row.get('ruolo', '')
                     })
                 else:
+                    if not key:
+                        continue
+                    if section not in profile:
+                        profile[section] = {}
                     profile[section][key] = value
         return profile
     else:
@@ -191,6 +193,73 @@ def match_label(text, profile):
     if VERBOSE_MODE and len(text_lower) > 3:
         print(f"      ✗ No match for '{text[:60]}'")
     return None, None
+
+
+def validate_profile(profile):
+    """Return a list of missing recommended MVP keys."""
+    required_keys = [
+        "azienda.ragione_sociale",
+        "azienda.cf_piva",
+        "azienda.sede_legale",
+        "legale_rappresentante.nome_completo",
+        "legale_rappresentante.codice_fiscale",
+    ]
+    missing = []
+    for key in required_keys:
+        val = get_profile_value(profile, key)
+        if val is None or str(val).strip() == "":
+            missing.append(key)
+    return missing
+
+
+def analyze_form_labels(form_path, profile):
+    """Quick label coverage analysis to improve MVP readiness."""
+    ext = form_path.suffix.lower()
+    labels = []
+    if ext == '.docx':
+        from docx import Document
+        doc = Document(str(form_path))
+        labels.extend(p.text.strip() for p in doc.paragraphs if p.text and p.text.strip())
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    t = cell.text.strip()
+                    if t:
+                        labels.append(t)
+    elif ext == '.pdf':
+        import fitz
+        doc = fitz.open(str(form_path))
+        for page in doc:
+            for line in page.get_text("text").splitlines():
+                line = line.strip()
+                if line:
+                    labels.append(line)
+        doc.close()
+    else:
+        return {"supported": False, "total": 0, "matched": 0, "unmatched_examples": []}
+
+    seen = set()
+    unique_labels = []
+    for label in labels:
+        if label not in seen:
+            seen.add(label)
+            unique_labels.append(label)
+
+    matched = 0
+    unmatched = []
+    for label in unique_labels:
+        _, val = match_label(label, profile)
+        if val:
+            matched += 1
+        elif len(label) > 3 and re.search(r"[A-Za-zÀ-ÿ]", label):
+            unmatched.append(label)
+
+    return {
+        "supported": True,
+        "total": len(unique_labels),
+        "matched": matched,
+        "unmatched_examples": unmatched[:12],
+    }
 
 
 def highlight_empty_fields(doc):
@@ -776,6 +845,8 @@ Examples:
                        help='Automatically process all forms in EMPTY_FORM/ and save to FILLED_FORM/')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Enable detailed debug logging for field matching')
+    parser.add_argument('--analyze', action='store_true',
+                       help='Analyze form label coverage before filling (MVP tuning mode)')
 
     args = parser.parse_args()
     
@@ -805,6 +876,11 @@ Examples:
     rep = profile.get('legale_rappresentante', {}).get('nome_completo', 'Unknown')
     print(f"   Company: {company}")
     print(f"   Representative: {rep}")
+    missing = validate_profile(profile)
+    if missing:
+        print("⚠️  Profile is missing recommended MVP fields:")
+        for k in missing:
+            print(f"   - {k}")
 
     if args.auto:
         # Auto mode: process all forms in EMPTY_FORM/
@@ -826,6 +902,14 @@ Examples:
         for form_path in forms:
             output_path = filled_dir / f"{form_path.stem}_COMPILATO{form_path.suffix}"
             print(f"Processing: {form_path.name} → {output_path.name}")
+            if args.analyze:
+                report = analyze_form_labels(form_path, profile)
+                if report["supported"]:
+                    print(f"  [ANALYZE] Labels matched: {report['matched']}/{report['total']}")
+                    if report["unmatched_examples"]:
+                        print("  [ANALYZE] Unmatched examples:")
+                        for item in report["unmatched_examples"][:5]:
+                            print(f"    - {item[:90]}")
             process_form(form_path, profile, output_path)
 
         print(f"\n🎉 All forms processed! Check FILLED_FORM/ for results.")
@@ -849,6 +933,14 @@ Examples:
 
         print(f"\n📄 Processing: {form_path.name}")
         print(f"   Output: {output_path.name}\n")
+        if args.analyze:
+            report = analyze_form_labels(form_path, profile)
+            if report["supported"]:
+                print(f"  [ANALYZE] Labels matched: {report['matched']}/{report['total']}")
+                if report["unmatched_examples"]:
+                    print("  [ANALYZE] Unmatched examples:")
+                    for item in report["unmatched_examples"][:8]:
+                        print(f"    - {item[:90]}")
 
         process_form(form_path, profile, output_path)
 

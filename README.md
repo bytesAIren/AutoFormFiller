@@ -25,6 +25,13 @@ python tender_filler.py --form "path/to/your/form.pdf"
 
 # Debug mode to see field matching details:
 python tender_filler.py --auto --verbose
+
+# MVP tuning mode: show label-coverage report before filling
+python tender_filler.py --auto --analyze
+
+# Optional: run quick local UI for MVP testing
+pip install streamlit
+streamlit run app_streamlit.py
 ```
 
 ## How It Works
@@ -105,6 +112,7 @@ soci,,Shareholder Name,,50%,Partner
 --output, -o   Output file path                     [default: adds _COMPILATO suffix]
 --auto         Process all forms in EMPTY_FORM/ and save to FILLED_FORM/
 --verbose, -v  Enable detailed debug logging for field matching
+--analyze      Analyze label coverage before filling (helps refine profile/map for MVP)
 ```
 
 ## Project Structure
@@ -122,6 +130,7 @@ AutoFormFiller/
 ## Features
 
 - ✅ **Automatic processing** of all forms in a directory
+- ✅ **Quick Streamlit UI** to test one form/profile interactively
 - ✅ **Dual format support** (JSON and CSV for company profiles)
 - ✅ **Intelligent field recognition** using semantic patterns
 - ✅ **Empty field highlighting** in yellow for manual review
