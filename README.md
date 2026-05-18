@@ -104,6 +104,15 @@ section,,nome,,quota,ruolo
 soci,,Shareholder Name,,50%,Partner
 ```
 
+For custom label aliases (highly recommended for MVP accuracy):
+```
+section,key,value
+mappature_label,denominazione operatore economico,azienda.ragione_sociale
+mappature_label,cf operatore,azienda.cf_piva
+mappature_label,mail referente gara,azienda.email
+```
+`key` = regex/text pattern found in the form label, `value` = target profile dotted key.
+
 ## Command Line Options
 
 ```
@@ -133,6 +142,7 @@ AutoFormFiller/
 - ✅ **Quick Streamlit UI** to test one form/profile interactively
 - ✅ **Dual format support** (JSON and CSV for company profiles)
 - ✅ **Intelligent field recognition** using semantic patterns
+- ✅ **Custom alias mapping** from profile (`mappature_label`) for form-specific labels
 - ✅ **Empty field highlighting** in yellow for manual review
 - ✅ **Debug mode** to troubleshoot field matching issues
 - ✅ **Clean output** with proper formatting and no leftover underscores

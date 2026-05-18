@@ -150,6 +150,14 @@ def load_profile(path):
                         'quota': row.get('quota', ''),
                         'ruolo': row.get('ruolo', '')
                     })
+                elif section == 'mappature_label':
+                    if 'mappature_label' not in profile:
+                        profile['mappature_label'] = []
+                    if key and value:
+                        profile['mappature_label'].append({
+                            'pattern': key,
+                            'target_key': value
+                        })
                 else:
                     if not key:
                         continue
@@ -173,15 +181,57 @@ def get_profile_value(profile, dotted_key):
     return val
 
 
+def normalize_label(text):
+    """Normalize label text to improve matching robustness across formats."""
+    if text is None:
+        return ""
+    text = str(text).lower().strip()
+    text = re.sub(r'[\u00a0\t\r\n]+', ' ', text)
+    text = re.sub(r'[“”"\'`´]', '', text)
+    text = re.sub(r'[():;,]+', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+def load_custom_label_aliases(profile):
+    """
+    Read optional user-defined aliases from profile.
+    JSON example:
+    "mappature_label": [{"pattern": "denominazione operatore", "target_key": "azienda.ragione_sociale"}]
+    """
+    aliases = []
+    raw = profile.get("mappature_label", [])
+    if not isinstance(raw, list):
+        return aliases
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        pattern = str(item.get("pattern", "")).strip()
+        key = str(item.get("target_key", "")).strip()
+        if pattern and key:
+            aliases.append((pattern, key))
+    return aliases
+
+
 def match_label(text, profile):
     """
     Given a text label, find the best matching profile value using semantic map.
     Returns (matched_key, value) or (None, None).
     """
-    text_lower = text.lower().strip()
+    text_lower = normalize_label(text)
     if len(text_lower) < 2:
         return None, None
 
+    # 1) User-defined aliases from profile (highest priority)
+    for pattern, key in load_custom_label_aliases(profile):
+        if re.search(pattern, text_lower, re.IGNORECASE):
+            val = get_profile_value(profile, key)
+            if val:
+                if VERBOSE_MODE:
+                    print(f"      ✓ Alias match '{text[:50]}' → {key} = '{str(val)[:40]}'")
+                return key, val
+
+    # 2) Built-in semantic map
     for pattern, key in SEMANTIC_MAP:
         if re.search(pattern, text_lower, re.IGNORECASE):
             val = get_profile_value(profile, key)
