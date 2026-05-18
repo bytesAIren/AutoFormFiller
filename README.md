@@ -25,6 +25,9 @@ python tender_filler.py --form "path/to/your/form.pdf"
 
 # Debug mode to see field matching details:
 python tender_filler.py --auto --verbose
+
+# MVP tuning mode: show label-coverage report before filling
+python tender_filler.py --auto --analyze
 ```
 
 ## How It Works
@@ -105,6 +108,7 @@ soci,,Shareholder Name,,50%,Partner
 --output, -o   Output file path                     [default: adds _COMPILATO suffix]
 --auto         Process all forms in EMPTY_FORM/ and save to FILLED_FORM/
 --verbose, -v  Enable detailed debug logging for field matching
+--analyze      Analyze label coverage before filling (helps refine profile/map for MVP)
 ```
 
 ## Project Structure
